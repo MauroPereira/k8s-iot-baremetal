@@ -90,7 +90,7 @@ Validates that the Mosquitto broker is active and responding. Runs three publish
 
 #### Performance benchmark — `01_bench_mosquitto.sh`
 
-Measures Mosquitto throughput and latency under simultaneous load from 20 clients. Requires an active `kubectl port-forward` before running. Automatically installs [`mqtt-benchmark`](https://github.com/krylovsk/mqtt-benchmark) via Go if missing.
+Checks that Mosquitto handles simultaneous publishing from 20 clients without errors. Requires an active `kubectl port-forward` before running. Automatically installs [`mqtt-benchmark`](https://github.com/krylovsk/mqtt-benchmark) via Go if missing.
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
@@ -110,18 +110,15 @@ kubectl port-forward svc/mosquitto 1883:1883 -n iot
 ./k8s-iot-baremetal/tests/01_bench_mosquitto.sh
 ```
 
-##### Results vs industry reference
+##### Results
 
-| Metric | Our result | Industry reference | Assessment |
-|--------|------------|--------------------|------------|
-| Delivery ratio | 1.000 (2400/2400) | 1.000 optimal | ✓ Perfect |
-| Average latency | ~0.08 ms | 2–15 ms acceptable, <10 ms good | ✓ Exceptional (25–100× better) |
-| Peak latency | 1.05 ms | <10 ms good | ✓ Excellent |
-| Total throughput | ~20 msg/sec | Up to 37k–82k msg/sec (Mosquitto at full load) | — Not intentionally stress-tested |
+| Metric | Result |
+|--------|--------|
+| Messages published without errors | 2400/2400 |
+| Load | 20 concurrent clients, ~20 msg/sec for ~2 min |
+| Publish time (mean / max) | ~0.08 ms / 1.05 ms |
 
-> **Note:** this test is intentionally not a throughput stress test — it simulates a realistic IoT load (20 devices at 1 msg/sec). Mosquitto on modest hardware can handle tens of thousands of msg/sec at full load. Sub-millisecond latency confirms the broker is healthy and well within its operating range.
->
-> Reference: [MQTT Brokers at Scale: Performance Tuning Mosquitto, HiveMQ, and EMQX — Java Code Geeks, August 2025](https://www.javacodegeeks.com/2025/08/mqtt-brokers-at-scale-performance-tuning-mosquitto-hivemq-and-emqx.html)
+> **Note:** with QoS 0 the broker does not acknowledge messages, so `mqtt-benchmark` measures **client-side publish time** (until the message is written to the connection), not end-to-end delivery latency, and the tool does not use subscribers. The result shows the broker accepts a realistic IoT load (20 devices at 1 msg/sec) without errors; it is not a latency or throughput stress test. End-to-end delivery (MQTT → Telegraf → InfluxDB) is verified every minute by the `pipeline-healthcheck` CronJob.
 
 #### IoT Simulator — `02_iot_simulator.sh`
 
@@ -224,7 +221,7 @@ Valida que el broker Mosquitto esté activo y respondiendo. Ejecuta tres rondas 
 
 #### Benchmark de rendimiento — `01_bench_mosquitto.sh`
 
-Mide el throughput y la latencia de Mosquitto bajo carga simultánea de 20 clientes. Requiere `kubectl port-forward` activo antes de ejecutarse. Instala [`mqtt-benchmark`](https://github.com/krylovsk/mqtt-benchmark) automáticamente vía Go si falta.
+Verifica que Mosquitto soporte la publicación simultánea de 20 clientes sin errores. Requiere `kubectl port-forward` activo antes de ejecutarse. Instala [`mqtt-benchmark`](https://github.com/krylovsk/mqtt-benchmark) automáticamente vía Go si falta.
 
 | Parámetro | Valor | Descripción |
 |-----------|-------|-------------|
@@ -244,18 +241,15 @@ kubectl port-forward svc/mosquitto 1883:1883 -n iot
 ./k8s-iot-baremetal/tests/01_bench_mosquitto.sh
 ```
 
-##### Resultados vs referencia de la industria
+##### Resultados
 
-| Métrica | Nuestro resultado | Referencia de la industria | Evaluación |
-|--------|------------|-------------------|------------|
-| Delivery ratio | 1.000 (2400/2400) | 1.000 óptimo | ✓ Perfecto |
-| Latencia promedio | ~0.08 ms | 2–15 ms aceptable, <10 ms bueno | ✓ Excepcional (25–100× mejor) |
-| Latencia máxima | 1.05 ms | <10 ms bueno | ✓ Excelente |
-| Throughput total | ~20 msg/seg | Hasta 37k–82k msg/seg (Mosquitto a carga plena) | — No se buscan límites (a propósito) |
+| Métrica | Resultado |
+|--------|-----------|
+| Mensajes publicados sin errores | 2400/2400 |
+| Carga | 20 clientes concurrentes, ~20 msg/seg durante ~2 min |
+| Tiempo de publicación (promedio / máximo) | ~0.08 ms / 1.05 ms |
 
-> **Nota:** el test intencionalmente no es un stress test de throughput — simula una carga IoT realista (20 dispositivos a 1 msg/seg). Mosquitto en hardware modesto puede manejar decenas de miles de msg/seg a carga plena. La latencia sub-milisegundo confirma que el broker está saludable y bien dentro de su rango operativo.
->
-> Referencia: [MQTT Brokers at Scale: Performance Tuning Mosquitto, HiveMQ, and EMQX — Java Code Geeks, agosto 2025](https://www.javacodegeeks.com/2025/08/mqtt-brokers-at-scale-performance-tuning-mosquitto-hivemq-and-emqx.html)
+> **Nota:** con QoS 0 el broker no confirma los mensajes, así que `mqtt-benchmark` mide el **tiempo de publicación del lado del cliente** (hasta que el mensaje se escribe en la conexión), no la latencia de entrega de punta a punta, y la herramienta no usa suscriptores. El resultado muestra que el broker acepta una carga IoT realista (20 dispositivos a 1 msg/seg) sin errores; no es un test de estrés de latencia ni de throughput. La entrega de punta a punta (MQTT → Telegraf → InfluxDB) la verifica cada minuto el CronJob `pipeline-healthcheck`.
 
 #### Simulador IoT — `02_iot_simulator.sh`
 
