@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pipeline-healthcheck
+  namespace: iot
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: healthcheck
+              image: alpine:3.19
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  apk add --no-cache mosquitto-clients curl > /dev/null 2>&1
+
+                  mosquitto_pub -h mosquitto -p 1883 -t sensors/sala \
+                    -m '{"device_id":"healthcheck","location":"sala","temperatura":99.9,"humedad":99.9}'
+
+                  sleep 12
+
+                  RESULT=$(curl -X POST "http://influxdb:8086/api/v2/query?org=iot-org" \
+                    -H "Authorization: Token ${INFLUXDB_TOKEN}" \
+                    -H "Content-Type: application/vnd.flux" \
+                    -d 'from(bucket:"iot-bucket")
+                          |> range(start:-25s)
+                          |> filter(fn:(r) => r._measurement == "sensors" and r.device_id == "healthcheck")
+                          |> count()' 2>&1)
+
+                  echo "==> QUERY RESULT: $RESULT"
+
+                  if echo "$RESULT" | grep -q ',_result,'; then
+                    echo "==> PASS"
+                    exit 0
+                  else
+                    echo "==> FAIL"
+                    exit 1
+                  fi
+              env:
+                - name: INFLUXDB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: influxdb-token-grafana
+                      key: token

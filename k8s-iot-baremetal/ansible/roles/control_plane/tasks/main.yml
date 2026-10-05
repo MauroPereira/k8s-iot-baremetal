@@ -1,0 +1,77 @@
+---
+- name: Check if Kubernetes is already initialized
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: kubeadm_init_file
+
+- name: Get installed kubeadm version
+  command: kubeadm version -o short
+  register: kubeadm_version_output
+  changed_when: false
+
+- name: Render kubeadm config
+  template:
+    src: kubeadm-config.yml.j2
+    dest: /tmp/kubeadm-config.yml
+    mode: '0600'
+
+- name: Initialize the Kubernetes cluster
+  command: kubeadm init --config /tmp/kubeadm-config.yml
+  when: not kubeadm_init_file.stat.exists
+  register: kubeadm_init_output
+
+- name: Create .kube directory for user
+  file:
+    path: "/home/{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Copy admin.conf to user's kube config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{ ansible_user }}/.kube/config"
+    remote_src: yes
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+
+- name: Install cilium-cli
+  shell: |
+    CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
+    curl -L --silent --remote-name \
+      "https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz"
+    tar xzf cilium-linux-amd64.tar.gz -C /usr/local/bin
+    rm cilium-linux-amd64.tar.gz
+  args:
+    creates: /usr/local/bin/cilium
+
+- name: Check if Cilium DaemonSet exists
+  become: no
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+  command: kubectl get daemonset cilium -n kube-system
+  register: cilium_ds_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Cilium CNI
+  become: no
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+  command: >
+    cilium install
+    --set ipam.operator.clusterPoolIPv4PodCIDRList={{ pod_network_cidr }}
+  when: cilium_ds_check.rc != 0
+
+- name: Get join command
+  command: kubeadm token create --print-join-command
+  register: join_command_raw
+  changed_when: false
+
+- name: Set join command as fact
+  set_fact:
+    join_command: "{{ join_command_raw.stdout }}"
+  delegate_to: "{{ inventory_hostname }}"
+  delegate_facts: true

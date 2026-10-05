@@ -1,0 +1,2 @@
+# Grafana dashboard JSON files — not K8s manifests, managed via ConfigMap
+k8s-iot-baremetal/k8s/**/*.json

@@ -1,0 +1,56 @@
+---
+- name: Add Docker GPG key
+  apt_key:
+    url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+    state: present
+    keyring: /etc/apt/keyrings/docker.gpg
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+
+- name: Install containerd
+  apt:
+    name: containerd.io
+    state: present
+    update_cache: yes
+
+- name: Create containerd config directory
+  file:
+    path: /etc/containerd
+    state: directory
+
+- name: Generate default containerd config
+  shell: containerd config default > /etc/containerd/config.toml
+  args:
+    creates: /etc/containerd/config.toml
+  notify: restart containerd
+
+- name: Enable SystemdCgroup in containerd config
+  lineinfile:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    line: '            SystemdCgroup = true'
+  notify: restart containerd
+
+- name: Set pause image as containerd sandbox
+  lineinfile:
+    path: /etc/containerd/config.toml
+    regexp: 'sandbox_image'
+    line: '    sandbox_image = "registry.k8s.io/pause:3.10"'
+  notify: restart containerd
+
+- name: Ensure containerd is started and enabled
+  service:
+    name: containerd
+    state: started
+    enabled: yes
+
+# Handler (placed in roles/container_runtime/handlers/main.yml normally, but for simplicity here)
+- name: restart containerd
+  service:
+    name: containerd
+    state: restarted
+  when: false # This is dummy, we will create handlers/main.yml

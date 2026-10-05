@@ -1,0 +1,27 @@
+---
+- name: Check if node is already joined
+  stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubelet_conf_file
+
+- name: Join worker to cluster
+  command: "{{ hostvars[groups['control_plane'][0]]['join_command'] }}"
+  when: not kubelet_conf_file.stat.exists
+
+- name: Check if node is registered in the cluster
+  become: no
+  delegate_to: "{{ groups['control_plane'][0] }}"
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+  command: kubectl get node {{ inventory_hostname }}
+  register: node_registered
+  changed_when: false
+  failed_when: false
+
+- name: Label node as worker
+  become: no
+  delegate_to: "{{ groups['control_plane'][0] }}"
+  environment:
+    KUBECONFIG: "/home/{{ ansible_user }}/.kube/config"
+  command: kubectl label node {{ inventory_hostname }} node-role.kubernetes.io/worker=worker --overwrite
+  when: node_registered.rc == 0

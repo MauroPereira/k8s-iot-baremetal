@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: iot
+data:
+  influxdb.yml: |
+    apiVersion: 1
+    datasources:
+      - name: InfluxDB
+        type: influxdb
+        uid: influxdb-iot
+        access: proxy
+        url: http://influxdb:8086
+        jsonData:
+          version: Flux
+          organization: iot-org
+          defaultBucket: iot-bucket
+        secureJsonData:
+          token: ${GRAFANA_TOKEN}

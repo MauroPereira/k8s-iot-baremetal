@@ -1,0 +1,35 @@
+# Standards and Docs
+CLAUDE.md
+**/CLAUDE.md
+agents.md
+**/agents.md
+
+# Editor local config (machine-specific, never tracked)
+.vscode/
+**/.vscode/
+
+# Temporary/scratch files
+TEMP_*
+**/TEMP_*
+
+# Claude Code local config (machine-specific, never tracked)
+.claude/
+**/.claude/
+
+# Sensitive configuration files (using .example instead)
+**/specs_hosts.txt
+**/inventory.ini
+coding_standards.md
+**/coding_standards.md
+github_setup.md
+**/github_setup.md
+**/project-presentation.md
+
+
+# Environment files
+**/.env
+
+# Common exclusions
+*.log
+*.tmp
+.DS_Store

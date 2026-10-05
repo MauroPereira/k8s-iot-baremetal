@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mosquitto-smoke-test
+  namespace: iot
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  ttlSecondsAfterFinished: 20
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: mqtt-test
+          image: eclipse-mosquitto:2
+          command:
+            - sh
+            - -c
+            - |
+              # Subscribe in background, exit after receiving 1 message (-C 1)
+              mosquitto_sub -h mosquitto -t test/smoke -C 1 > /tmp/result &
+              SUB_PID=$!
+              sleep 1
+              # Publish test message
+              mosquitto_pub -h mosquitto -t test/smoke -m "ok"
+              # Wait for subscriber to receive it
+              wait $SUB_PID
+              RESULT=$(cat /tmp/result)
+              if [ "$RESULT" = "ok" ]; then
+                echo "Smoke test passed: broker received and delivered the message."
+                exit 0
+              else
+                echo "Smoke test failed: expected 'ok', got '${RESULT}'"
+                exit 1
+              fi

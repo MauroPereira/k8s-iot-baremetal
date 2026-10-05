@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: iot
+data:
+  provider.yml: |
+    apiVersion: 1
+    providers:
+      - name: IoT
+        type: file
+        disableDeletion: true
+        allowUiUpdates: true
+        options:
+          path: /var/grafana/dashboards

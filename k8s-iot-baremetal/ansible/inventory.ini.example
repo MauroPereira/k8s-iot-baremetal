@@ -1,0 +1,14 @@
+[all:vars]
+ansible_user=your_user
+ansible_become=yes
+
+[control_plane]
+k8s-node-00 ansible_host=10.x.x.x
+
+[workers]
+k8s-node-01 ansible_host=10.x.x.x
+k8s-node-02 ansible_host=10.x.x.x
+
+[k8s_cluster:children]
+control_plane
+workers
